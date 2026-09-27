@@ -1,6 +1,16 @@
 import { Stack } from "expo-router";
+import { useEffect, useState } from "react";
+import { initDatabase } from "../database/db";
 
 export default function RootLayout() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    initDatabase().then(() => setReady(true));
+  }, []);
+
+  if (!ready) return null;
+
   return (
     <Stack
       screenOptions={{
