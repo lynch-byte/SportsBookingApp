@@ -27,7 +27,7 @@ export type BookingWithCourt = Booking & {
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 function getDb() {
-  if (!dbPromise) dbPromise = SQLite.openDatabaseAsync("courtbooking.db");
+  if (!dbPromise) dbPromise = SQLite.openDatabaseAsync("courtbooking_v3.db");
   return dbPromise;
 }
 
@@ -63,13 +63,14 @@ export async function initDatabase() {
   );
   if (row && row.count === 0) {
     const seed: [string, string, string, string][] = [
-      ["Basketball Court A", "Basketball", "Main Gym", "Full-size indoor court with wooden flooring."],
-      ["Basketball Court B", "Basketball", "Outdoor Area", "Covered outdoor court, good for practice games."],
-      ["Badminton Court 1", "Badminton", "Sports Hall", "Indoor court with synthetic flooring."],
-      ["Badminton Court 2", "Badminton", "Sports Hall", "Indoor court beside Court 1."],
-      ["Volleyball Court", "Volleyball", "Open Field", "Standard court with net and boundary lines."],
-      ["Tennis Court", "Tennis", "East Side", "Hard court with lighting for evening play."],
-    ];
+  ["RDR Gymnasium", "Basketball", "Davao del Norte Sports and Tourism Complex, Mankilam, Tagum City", "Indoor gymnasium inside the provincial sports complex."],
+  ["Rotary Park Court", "Basketball", "Rotary Park, Tagum City", "Public outdoor basketball court, busy from early morning."],
+  ["DNSTC Tennis Court", "Tennis", "Davao del Norte Sports and Tourism Complex, Mankilam, Tagum City", "Tennis courts inside the provincial sports complex."],
+  ["MZ Racquet Zone", "Badminton", "Rabe Compound, Tagum City", "Badminton venue in Tagum City."],
+  ["City Pickle Grounds", "Pickleball", "Tagum City Hall, Ayala Avenue, Tagum City", "6 outdoor concrete courts with permanent lines and nets."],
+  ["Paddle Point Tagum", "Pickleball", "Mabini St, Tagum City", "5 indoor hard courts with pro shop and food available."],
+  ["The Rally Point", "Pickleball", "Mankilam, Tagum City", "4 outdoor hard courts with restrooms and lights."],
+];
     for (const c of seed) {
       await db.runAsync(
         "INSERT INTO courts (name, sport_type, location, description) VALUES (?, ?, ?, ?)",
