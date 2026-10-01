@@ -1,4 +1,8 @@
+
 import * as SQLite from "expo-sqlite";
+import { COURTS_SEED } from "./courtsData";
+
+
 
 export type Court = {
   id: number;
@@ -6,6 +10,10 @@ export type Court = {
   sport_type: string;
   location: string;
   description: string;
+  price_from: number | null;
+  price_unit: string;
+  price_note: string | null;
+  booking_url: string | null;
 };
 
 export type Booking = {
@@ -27,7 +35,7 @@ export type BookingWithCourt = Booking & {
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 function getDb() {
-  if (!dbPromise) dbPromise = SQLite.openDatabaseAsync("courtbooking_v3.db");
+  if (!dbPromise) dbPromise = SQLite.openDatabaseAsync("courtbooking_v4.db");
   return dbPromise;
 }
 
@@ -37,12 +45,16 @@ export async function initDatabase() {
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
 
-    CREATE TABLE IF NOT EXISTS courts (
+        CREATE TABLE IF NOT EXISTS courts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       sport_type TEXT NOT NULL,
       location TEXT,
-      description TEXT
+      description TEXT,
+      price_from REAL,
+      price_unit TEXT NOT NULL DEFAULT 'hour',
+      price_note TEXT,
+      booking_url TEXT
     );
 
     CREATE TABLE IF NOT EXISTS bookings (
@@ -58,28 +70,23 @@ export async function initDatabase() {
     );
   `);
 
-  const row = await db.getFirstAsync<{ count: number }>(
+    const row = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM courts"
   );
-  if (row && row.count === 0) {
-    const seed: [string, string, string, string][] = [
-  ["RDR Gymnasium", "Basketball", "Davao del Norte Sports and Tourism Complex, Mankilam, Tagum City", "Indoor gymnasium inside the provincial sports complex."],
-  ["Rotary Park Court", "Basketball", "Rotary Park, Tagum City", "Public outdoor basketball court, busy from early morning."],
-  ["DNSTC Tennis Court", "Tennis", "Davao del Norte Sports and Tourism Complex, Mankilam, Tagum City", "Tennis courts inside the provincial sports complex."],
-  ["MZ Racquet Zone", "Badminton", "Rabe Compound, Tagum City", "Badminton venue in Tagum City."],
-  ["City Pickle Grounds", "Pickleball", "Tagum City Hall, Ayala Avenue, Tagum City", "6 outdoor concrete courts with permanent lines and nets."],
-  ["Paddle Point Tagum", "Pickleball", "Mabini St, Tagum City", "5 indoor hard courts with pro shop and food available."],
-  ["The Rally Point", "Pickleball", "Mankilam, Tagum City", "4 outdoor hard courts with restrooms and lights."],
-];
-    for (const c of seed) {
-      await db.runAsync(
-        "INSERT INTO courts (name, sport_type, location, description) VALUES (?, ?, ?, ?)",
-        c
-      );
-    }
+    if (row && row.count === 0) {
+    await db.withTransactionAsync(async () => {
+      for (const c of COURTS_SEED) {
+        await db.runAsync(
+          `INSERT INTO courts
+            (name, sport_type, location, description, price_from, price_unit, price_note, booking_url)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [c.name, c.sport_type, c.location, c.description,
+           c.price_from, c.price_unit, c.price_note, c.booking_url]
+        );
+      }
+    });
   }
 }
-
 // ---------- READ ----------
 
 export async function getCourts(sportType?: string): Promise<Court[]> {
