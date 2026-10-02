@@ -12,6 +12,7 @@ export type CourtSeed = {
   price_unit: "hour" | "person";
   price_note: string | null;
   booking_url: string | null; // Facebook page, booking site, or sheet
+  court_count: number;
 };
 
 // [name, sport, location, description, price, url, note?, unit?]
@@ -201,6 +202,7 @@ export const COURTS_SEED: CourtSeed[] = rows.map(
       price_unit: unit ?? "hour",
       price_note: note ?? (isRange ? `Range: ₱${price[0]}–${price[1]}/hr` : null),
       booking_url: url,
+      court_count: Number(description.match(/^(\d+)\s/)?.[1] ?? 1),
     };
   }
 );

@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   FlatList,
@@ -45,6 +46,7 @@ function getLinkLabel(url: string | null) {
 }
 
 export default function CourtsScreen() {
+  const router = useRouter();
   const [courts, setCourts] = useState<Court[]>([]);
   const [selectedSport, setSelectedSport] = useState("All");
 
@@ -87,8 +89,20 @@ export default function CourtsScreen() {
         renderItem={({ item }) => {
           const linkLabel = getLinkLabel(item.booking_url);
           return (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>{item.name}</Text>
+            <TouchableOpacity
+              style={styles.card}
+              activeOpacity={0.7}
+              onPress={() =>
+                router.push({
+                  pathname: "/court/[id]",
+                  params: { id: String(item.id) },
+                })
+              }
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>{item.name}</Text>
+                <Text style={styles.chevron}>›</Text>
+              </View>
               <Text style={styles.cardSubtitle}>
                 {item.sport_type} • {item.location}
               </Text>
@@ -113,7 +127,12 @@ export default function CourtsScreen() {
               ) : (
                 <Text style={styles.inPerson}>Book in person</Text>
               )}
-            </View>
+
+              <View style={styles.tapRow}>
+                <Text style={styles.tapText}>See availability</Text>
+                <Text style={styles.tapText}>›</Text>
+              </View>
+            </TouchableOpacity>
           );
         }}
       />
@@ -150,9 +169,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     elevation: 2,
   },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   cardTitle: {
+    flex: 1,
     fontSize: 16,
     fontWeight: "bold",
+  },
+  chevron: {
+    fontSize: 26,
+    lineHeight: 26,
+    color: "#0B2A5B",
+    marginLeft: 8,
   },
   cardSubtitle: {
     color: "#6B7280",
@@ -188,5 +219,19 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: "#6B7280",
     fontStyle: "italic",
+  },
+  tapRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  tapText: {
+    color: "#0B2A5B",
+    fontWeight: "600",
+    fontSize: 14,
   },
 });
