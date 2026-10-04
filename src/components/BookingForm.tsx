@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Booking, getBookingsForCourtOnDate } from "../database/db";
 
@@ -77,7 +77,9 @@ export default function BookingForm({
   const [contact, setContact] = useState(initial?.contact_number ?? "");
   const [courtNumber, setCourtNumber] = useState(initial?.court_number ?? 1);
   const [date, setDate] = useState(initial?.date ?? today);
-  const [start, setStart] = useState<string | null>(initial?.start_time ?? null);
+  const [start, setStart] = useState<string | null>(
+    initial?.start_time ?? null,
+  );
   const [duration, setDuration] = useState(initial?.duration ?? 1);
   const [booked, setBooked] = useState<Booking[]>([]);
   const [saving, setSaving] = useState(false);
@@ -88,7 +90,10 @@ export default function BookingForm({
   const dates = Array.from({ length: 14 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
-    return { value: toDateStr(d), label: `${DAY_NAMES[d.getDay()]} ${d.getDate()}` };
+    return {
+      value: toDateStr(d),
+      label: `${DAY_NAMES[d.getDay()]} ${d.getDate()}`,
+    };
   });
   if (!dates.some((d) => d.value === date)) {
     dates.unshift({ value: date, label: date.slice(5) });
@@ -100,12 +105,12 @@ export default function BookingForm({
 
   const hours = Array.from(
     { length: CLOSE_HOUR - OPEN_HOUR },
-    (_, i) => OPEN_HOUR + i
+    (_, i) => OPEN_HOUR + i,
   );
 
   // Bookings on the court the user has selected (other courts are ignored)
   const courtBookings = booked.filter(
-    (b) => b.court_number === courtNumber && b.id !== bookingId
+    (b) => b.court_number === courtNumber && b.id !== bookingId,
   );
 
   // Why a slot can't be picked (null = available)
@@ -113,7 +118,11 @@ export default function BookingForm({
     const s = hour * 60;
     const e = s + duration * 60;
     if (e > CLOSE_HOUR * 60) return "late";
-    if (!bookingId && date === today && s <= now.getHours() * 60 + now.getMinutes()) {
+    if (
+      !bookingId &&
+      date === today &&
+      s <= now.getHours() * 60 + now.getMinutes()
+    ) {
       return "past";
     }
     const clash = courtBookings.some((b) => {
@@ -151,7 +160,10 @@ export default function BookingForm({
     });
     setSaving(false);
     if (!res.ok) {
-      Alert.alert("Can't save", res.message ?? "Please try another time.");
+      Alert.alert(
+        "Booking conflict",
+        res.message ?? "Please try another time.",
+      );
       return;
     }
     onDone();
@@ -192,7 +204,10 @@ export default function BookingForm({
                 style={[styles.chip, courtNumber === n && styles.chipActive]}
               >
                 <Text
-                  style={[styles.chipText, courtNumber === n && styles.chipTextActive]}
+                  style={[
+                    styles.chipText,
+                    courtNumber === n && styles.chipTextActive,
+                  ]}
                 >
                   Court {n}
                 </Text>
@@ -211,7 +226,12 @@ export default function BookingForm({
               onPress={() => setDate(d.value)}
               style={[styles.chip, date === d.value && styles.chipActive]}
             >
-              <Text style={[styles.chipText, date === d.value && styles.chipTextActive]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  date === d.value && styles.chipTextActive,
+                ]}
+              >
                 {d.label}
               </Text>
             </TouchableOpacity>
@@ -227,7 +247,9 @@ export default function BookingForm({
             onPress={() => setDuration(d)}
             style={[styles.chip, duration === d && styles.chipActive]}
           >
-            <Text style={[styles.chipText, duration === d && styles.chipTextActive]}>
+            <Text
+              style={[styles.chipText, duration === d && styles.chipTextActive]}
+            >
               {d} hr{d > 1 ? "s" : ""}
             </Text>
           </TouchableOpacity>
@@ -275,7 +297,11 @@ export default function BookingForm({
               </Text>
               {reason && (
                 <Text
-                  style={reason === "booked" ? styles.reasonBooked : styles.reasonOther}
+                  style={
+                    reason === "booked"
+                      ? styles.reasonBooked
+                      : styles.reasonOther
+                  }
                 >
                   {REASON_TEXT[reason]}
                 </Text>
@@ -311,7 +337,12 @@ const styles = StyleSheet.create({
   container: { padding: 20, paddingBottom: 40 },
   courtName: { fontSize: 22, fontWeight: "bold", color: "#0B2A5B" },
   courtInfo: { color: "#6B7280", marginTop: 2 },
-  label: { marginTop: 18, marginBottom: 6, fontWeight: "600", color: "#374151" },
+  label: {
+    marginTop: 18,
+    marginBottom: 6,
+    fontWeight: "600",
+    color: "#374151",
+  },
   courtNote: { color: "#6B7280", marginBottom: 8 },
   input: {
     borderWidth: 1,
@@ -340,7 +371,12 @@ const styles = StyleSheet.create({
   chipText: { color: "#374151", fontWeight: "500" },
   chipTextActive: { color: "#fff" },
   chipTextDisabled: { color: "#9CA3AF", textDecorationLine: "line-through" },
-  reasonBooked: { marginTop: 2, fontSize: 11, fontWeight: "700", color: "#B91C1C" },
+  reasonBooked: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#B91C1C",
+  },
   reasonOther: { marginTop: 2, fontSize: 11, color: "#6B7280" },
   summary: { marginTop: 8, color: "#16A34A", fontWeight: "700" },
   submit: {

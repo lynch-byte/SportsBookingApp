@@ -72,7 +72,7 @@ export async function initDatabase() {
   `);
 
   const row = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM courts"
+    "SELECT COUNT(*) as count FROM courts",
   );
   if (row && row.count === 0) {
     for (const c of COURTS_SEED) {
@@ -80,8 +80,17 @@ export async function initDatabase() {
         `INSERT INTO courts
           (name, sport_type, location, description, price_from, price_unit, price_note, booking_url, court_count)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [c.name, c.sport_type, c.location, c.description,
-         c.price_from, c.price_unit, c.price_note, c.booking_url, c.court_count]
+        [
+          c.name,
+          c.sport_type,
+          c.location,
+          c.description,
+          c.price_from,
+          c.price_unit,
+          c.price_note,
+          c.booking_url,
+          c.court_count,
+        ],
       );
     }
   }
@@ -94,7 +103,7 @@ export async function getCourts(sportType?: string): Promise<Court[]> {
   if (sportType && sportType !== "All") {
     return db.getAllAsync<Court>(
       "SELECT * FROM courts WHERE sport_type = ? ORDER BY name",
-      [sportType]
+      [sportType],
     );
   }
   return db.getAllAsync<Court>("SELECT * FROM courts ORDER BY name");
@@ -122,12 +131,12 @@ export async function getBookingById(id: number): Promise<Booking | null> {
 
 export async function getBookingsForCourtOnDate(
   courtId: number,
-  date: string
+  date: string,
 ): Promise<Booking[]> {
   const db = await getDb();
   return db.getAllAsync<Booking>(
     "SELECT * FROM bookings WHERE court_id = ? AND date = ? ORDER BY start_time",
-    [courtId, date]
+    [courtId, date],
   );
 }
 
@@ -144,7 +153,7 @@ export async function hasConflict(
   date: string,
   startTime: string,
   duration: number,
-  excludeBookingId?: number
+  excludeBookingId?: number,
 ): Promise<boolean> {
   const existing = await getBookingsForCourtOnDate(courtId, date);
   const newStart = toMinutes(startTime);
@@ -158,20 +167,83 @@ export async function hasConflict(
     return newStart < end && newEnd > start;
   });
 }
+function digitsOnly(s: string) {
+  return s.replace(/\D/g, "");
+}
 
+// Finds a booking by the same person (same contact number) that overlaps in time,
+// at ANY venue. Returns a message if found, otherwise null.
+export async function findPersonConflict(
+  contact: string,
+  date: string,
+  startTime: string,
+  duration: number,
+  excludeBookingId?: number,
+): Promise<string | null> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<BookingWithCourt>(
+    `SELECT b.*, c.name AS court_name, c.sport_type
+     FROM bookings b
+     JOIN courts c ON c.id = b.court_id
+     WHERE b.date = ?`,
+    [date],
+  );
+  const newStart = toMinutes(startTime);
+  const newEnd = newStart + duration * 60;
+
+  const clash = rows.find((b) => {
+    if (b.id === excludeBookingId) return false;
+    if (digitsOnly(b.contact_number) !== digitsOnly(contact)) return false;
+    const s = toMinutes(b.start_time);
+    const e = s + b.duration * 60;
+    return newStart < e && newEnd > s;
+  });
+
+  return clash
+    ? `This conflicts with your booking at ${clash.court_name} (Court ${clash.court_number}) at that time.`
+    : null;
+}
 // ---------- CREATE ----------
 
 export async function addBooking(
-  b: Omit<Booking, "id" | "status">
+  b: Omit<Booking, "id" | "status">,
 ): Promise<{ ok: boolean; message?: string }> {
-  if (await hasConflict(b.court_id, b.court_number, b.date, b.start_time, b.duration)) {
-    return { ok: false, message: "That court is already booked at that time." };
+  if (
+    await hasConflict(
+      b.court_id,
+      b.court_number,
+      b.date,
+      b.start_time,
+      b.duration,
+    )
+  ) {
+    return {
+      ok: false,
+      message: "This time conflicts with an existing booking on that court.",
+    };
   }
+
+  const personClash = await findPersonConflict(
+    b.contact_number,
+    b.date,
+    b.start_time,
+    b.duration,
+  );
+  if (personClash) return { ok: false, message: personClash };
+
   const db = await getDb();
   await db.runAsync(
     `INSERT INTO bookings (court_id, court_number, name, contact_number, date, start_time, duration)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [b.court_id, b.court_number, b.name, b.contact_number, b.date, b.start_time, b.duration]
+    [
+      b.court_id,
+      b.court_number,
+      b.name,
+      b.contact_number,
+      b.date,
+      b.start_time,
+      b.duration,
+    ],
   );
   return { ok: true };
 }
@@ -180,24 +252,48 @@ export async function addBooking(
 
 export async function updateBooking(
   id: number,
-  b: Omit<Booking, "id" | "status">
+  b: Omit<Booking, "id" | "status">,
 ): Promise<{ ok: boolean; message?: string }> {
-  if (await hasConflict(b.court_id, b.court_number, b.date, b.start_time, b.duration, id)) {
-    return { ok: false, message: "That court is already booked at that time." };
+  if (
+    await hasConflict(
+      b.court_id,
+      b.court_number,
+      b.date,
+      b.start_time,
+      b.duration,
+      id,
+    )
+  ) {
+    return {
+      ok: false,
+      message: "This time conflicts with an existing booking on that court.",
+    };
   }
+
+  const personClash = await findPersonConflict(
+    b.contact_number,
+    b.date,
+    b.start_time,
+    b.duration,
+    id,
+  );
+  if (personClash) return { ok: false, message: personClash };
+
   const db = await getDb();
   await db.runAsync(
     `UPDATE bookings
      SET court_id = ?, court_number = ?, name = ?, contact_number = ?, date = ?, start_time = ?, duration = ?
      WHERE id = ?`,
-    [b.court_id, b.court_number, b.name, b.contact_number, b.date, b.start_time, b.duration, id]
+    [
+      b.court_id,
+      b.court_number,
+      b.name,
+      b.contact_number,
+      b.date,
+      b.start_time,
+      b.duration,
+      id,
+    ],
   );
   return { ok: true };
-}
-
-// ---------- DELETE ----------
-
-export async function deleteBooking(id: number) {
-  const db = await getDb();
-  await db.runAsync("DELETE FROM bookings WHERE id = ?", [id]);
 }
