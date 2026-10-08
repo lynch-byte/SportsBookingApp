@@ -23,7 +23,10 @@ export default function BookCourtScreen() {
       submitLabel="Confirm booking"
       onSubmit={(d) => addBooking({ court_id: court.id, ...d })}
       onDone={() => {
-        Alert.alert("Booked!", "Your reservation was saved.");
+        Alert.alert(
+          "Booked!",
+          "Your reservation was saved in this app. Please confirm with the venue to secure your slot."
+        );
         router.replace("/(tabs)/my-bookings");
       }}
     />

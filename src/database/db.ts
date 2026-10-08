@@ -20,6 +20,7 @@ export type Booking = {
   court_number: number; // which court at the venue (1, 2, 3...)
   name: string;
   contact_number: string;
+  activity: string; // purpose of the booking
   date: string; // YYYY-MM-DD
   start_time: string; // HH:MM (24h)
   duration: number; // hours
@@ -34,7 +35,7 @@ export type BookingWithCourt = Booking & {
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 function getDb() {
-  if (!dbPromise) dbPromise = SQLite.openDatabaseAsync("courtbooking_v5.db");
+  if (!dbPromise) dbPromise = SQLite.openDatabaseAsync("courtbooking_v6.db");
   return dbPromise;
 }
 
@@ -63,6 +64,7 @@ export async function initDatabase() {
       court_number INTEGER NOT NULL DEFAULT 1,
       name TEXT NOT NULL,
       contact_number TEXT NOT NULL,
+      activity TEXT NOT NULL DEFAULT 'Casual play',
       date TEXT NOT NULL,
       start_time TEXT NOT NULL,
       duration INTEGER NOT NULL,
@@ -75,24 +77,26 @@ export async function initDatabase() {
     "SELECT COUNT(*) as count FROM courts",
   );
   if (row && row.count === 0) {
-    for (const c of COURTS_SEED) {
-      await db.runAsync(
-        `INSERT INTO courts
-          (name, sport_type, location, description, price_from, price_unit, price_note, booking_url, court_count)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          c.name,
-          c.sport_type,
-          c.location,
-          c.description,
-          c.price_from,
-          c.price_unit,
-          c.price_note,
-          c.booking_url,
-          c.court_count,
-        ],
-      );
-    }
+    await db.withTransactionAsync(async () => {
+      for (const c of COURTS_SEED) {
+        await db.runAsync(
+          `INSERT INTO courts
+            (name, sport_type, location, description, price_from, price_unit, price_note, booking_url, court_count)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            c.name,
+            c.sport_type,
+            c.location,
+            c.description,
+            c.price_from,
+            c.price_unit,
+            c.price_note,
+            c.booking_url,
+            c.court_count,
+          ],
+        );
+      }
+    });
   }
 }
 
@@ -167,6 +171,7 @@ export async function hasConflict(
     return newStart < end && newEnd > start;
   });
 }
+
 function digitsOnly(s: string) {
   return s.replace(/\D/g, "");
 }
@@ -203,19 +208,14 @@ export async function findPersonConflict(
     ? `This conflicts with your booking at ${clash.court_name} (Court ${clash.court_number}) at that time.`
     : null;
 }
+
 // ---------- CREATE ----------
 
 export async function addBooking(
   b: Omit<Booking, "id" | "status">,
 ): Promise<{ ok: boolean; message?: string }> {
   if (
-    await hasConflict(
-      b.court_id,
-      b.court_number,
-      b.date,
-      b.start_time,
-      b.duration,
-    )
+    await hasConflict(b.court_id, b.court_number, b.date, b.start_time, b.duration)
   ) {
     return {
       ok: false,
@@ -233,13 +233,14 @@ export async function addBooking(
 
   const db = await getDb();
   await db.runAsync(
-    `INSERT INTO bookings (court_id, court_number, name, contact_number, date, start_time, duration)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO bookings (court_id, court_number, name, contact_number, activity, date, start_time, duration)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       b.court_id,
       b.court_number,
       b.name,
       b.contact_number,
+      b.activity,
       b.date,
       b.start_time,
       b.duration,
@@ -249,10 +250,6 @@ export async function addBooking(
 }
 
 // ---------- UPDATE ----------
-export async function deleteBooking(id: number) {
-  const db = await getDb();
-  await db.runAsync("DELETE FROM bookings WHERE id = ?", [id]);
-}
 
 export async function updateBooking(
   id: number,
@@ -286,13 +283,14 @@ export async function updateBooking(
   const db = await getDb();
   await db.runAsync(
     `UPDATE bookings
-     SET court_id = ?, court_number = ?, name = ?, contact_number = ?, date = ?, start_time = ?, duration = ?
+     SET court_id = ?, court_number = ?, name = ?, contact_number = ?, activity = ?, date = ?, start_time = ?, duration = ?
      WHERE id = ?`,
     [
       b.court_id,
       b.court_number,
       b.name,
       b.contact_number,
+      b.activity,
       b.date,
       b.start_time,
       b.duration,
@@ -300,4 +298,11 @@ export async function updateBooking(
     ],
   );
   return { ok: true };
+}
+
+// ---------- DELETE ----------
+
+export async function deleteBooking(id: number) {
+  const db = await getDb();
+  await db.runAsync("DELETE FROM bookings WHERE id = ?", [id]);
 }

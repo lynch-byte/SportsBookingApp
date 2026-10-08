@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -49,13 +50,34 @@ export default function CourtsScreen() {
   const router = useRouter();
   const [courts, setCourts] = useState<Court[]>([]);
   const [selectedSport, setSelectedSport] = useState("All");
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     getCourts(selectedSport).then(setCourts);
   }, [selectedSport]);
 
+  // Search by venue name or location
+  const q = query.trim().toLowerCase();
+  const shown = q
+    ? courts.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          (c.location ?? "").toLowerCase().includes(q)
+      )
+    : courts;
+
   return (
     <View style={{ flex: 1 }}>
+      {/* Search box */}
+      <TextInput
+        style={styles.search}
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search by name or location"
+        clearButtonMode="while-editing"
+        autoCorrect={false}
+      />
+
       {/* Filter chips (scroll sideways) */}
       <ScrollView
         horizontal
@@ -83,9 +105,13 @@ export default function CourtsScreen() {
 
       {/* Court list */}
       <FlatList
-        data={courts}
+        data={shown}
         keyExtractor={(c) => String(c.id)}
         contentContainerStyle={{ padding: 16 }}
+        keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={
+          <Text style={styles.empty}>No courts match your search.</Text>
+        }
         renderItem={({ item }) => {
           const linkLabel = getLinkLabel(item.booking_url);
           return (
@@ -141,6 +167,17 @@ export default function CourtsScreen() {
 }
 
 const styles = StyleSheet.create({
+  search: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 10,
+    backgroundColor: "#fff",
+  },
+  empty: { textAlign: "center", color: "#6B7280", marginTop: 32 },
   filterRow: {
     flexDirection: "row",
     gap: 8,

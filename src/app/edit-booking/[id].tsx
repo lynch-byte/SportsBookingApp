@@ -38,6 +38,7 @@ export default function EditBookingScreen() {
         name: booking.name,
         contact_number: booking.contact_number,
         court_number: booking.court_number,
+        activity: booking.activity,
         date: booking.date,
         start_time: booking.start_time,
         duration: booking.duration,

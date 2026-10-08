@@ -15,6 +15,7 @@ export type FormData = {
   name: string;
   contact_number: string;
   court_number: number;
+  activity: string;
   date: string; // YYYY-MM-DD
   start_time: string; // HH:MM
   duration: number;
@@ -36,6 +37,7 @@ type Reason = "late" | "past" | "booked" | null;
 const OPEN_HOUR = 6;
 const CLOSE_HOUR = 22;
 const DURATIONS = [1, 2, 3, 4];
+const ACTIVITIES = ["Casual play", "Practice", "Game / Match", "Training", "Event"];
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const REASON_TEXT = { late: "Too late", past: "Passed", booked: "Booked" };
 
@@ -76,10 +78,9 @@ export default function BookingForm({
   const [name, setName] = useState(initial?.name ?? "");
   const [contact, setContact] = useState(initial?.contact_number ?? "");
   const [courtNumber, setCourtNumber] = useState(initial?.court_number ?? 1);
+  const [activity, setActivity] = useState(initial?.activity ?? "Casual play");
   const [date, setDate] = useState(initial?.date ?? today);
-  const [start, setStart] = useState<string | null>(
-    initial?.start_time ?? null,
-  );
+  const [start, setStart] = useState<string | null>(initial?.start_time ?? null);
   const [duration, setDuration] = useState(initial?.duration ?? 1);
   const [booked, setBooked] = useState<Booking[]>([]);
   const [saving, setSaving] = useState(false);
@@ -90,10 +91,7 @@ export default function BookingForm({
   const dates = Array.from({ length: 14 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
-    return {
-      value: toDateStr(d),
-      label: `${DAY_NAMES[d.getDay()]} ${d.getDate()}`,
-    };
+    return { value: toDateStr(d), label: `${DAY_NAMES[d.getDay()]} ${d.getDate()}` };
   });
   if (!dates.some((d) => d.value === date)) {
     dates.unshift({ value: date, label: date.slice(5) });
@@ -105,12 +103,12 @@ export default function BookingForm({
 
   const hours = Array.from(
     { length: CLOSE_HOUR - OPEN_HOUR },
-    (_, i) => OPEN_HOUR + i,
+    (_, i) => OPEN_HOUR + i
   );
 
   // Bookings on the court the user has selected (other courts are ignored)
   const courtBookings = booked.filter(
-    (b) => b.court_number === courtNumber && b.id !== bookingId,
+    (b) => b.court_number === courtNumber && b.id !== bookingId
   );
 
   // Why a slot can't be picked (null = available)
@@ -118,11 +116,7 @@ export default function BookingForm({
     const s = hour * 60;
     const e = s + duration * 60;
     if (e > CLOSE_HOUR * 60) return "late";
-    if (
-      !bookingId &&
-      date === today &&
-      s <= now.getHours() * 60 + now.getMinutes()
-    ) {
+    if (!bookingId && date === today && s <= now.getHours() * 60 + now.getMinutes()) {
       return "past";
     }
     const clash = courtBookings.some((b) => {
@@ -154,16 +148,14 @@ export default function BookingForm({
       name: name.trim(),
       contact_number: contact.trim(),
       court_number: courtNumber,
+      activity,
       date,
       start_time: start,
       duration,
     });
     setSaving(false);
     if (!res.ok) {
-      Alert.alert(
-        "Booking conflict",
-        res.message ?? "Please try another time.",
-      );
+      Alert.alert("Booking conflict", res.message ?? "Please try another time.");
       return;
     }
     onDone();
@@ -204,10 +196,7 @@ export default function BookingForm({
                 style={[styles.chip, courtNumber === n && styles.chipActive]}
               >
                 <Text
-                  style={[
-                    styles.chipText,
-                    courtNumber === n && styles.chipTextActive,
-                  ]}
+                  style={[styles.chipText, courtNumber === n && styles.chipTextActive]}
                 >
                   Court {n}
                 </Text>
@@ -216,6 +205,21 @@ export default function BookingForm({
           </View>
         </>
       )}
+
+      <Text style={styles.label}>Activity / purpose</Text>
+      <View style={[styles.row, { flexWrap: "wrap" }]}>
+        {ACTIVITIES.map((a) => (
+          <TouchableOpacity
+            key={a}
+            onPress={() => setActivity(a)}
+            style={[styles.chip, activity === a && styles.chipActive]}
+          >
+            <Text style={[styles.chipText, activity === a && styles.chipTextActive]}>
+              {a}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <Text style={styles.label}>Date</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -226,12 +230,7 @@ export default function BookingForm({
               onPress={() => setDate(d.value)}
               style={[styles.chip, date === d.value && styles.chipActive]}
             >
-              <Text
-                style={[
-                  styles.chipText,
-                  date === d.value && styles.chipTextActive,
-                ]}
-              >
+              <Text style={[styles.chipText, date === d.value && styles.chipTextActive]}>
                 {d.label}
               </Text>
             </TouchableOpacity>
@@ -247,9 +246,7 @@ export default function BookingForm({
             onPress={() => setDuration(d)}
             style={[styles.chip, duration === d && styles.chipActive]}
           >
-            <Text
-              style={[styles.chipText, duration === d && styles.chipTextActive]}
-            >
+            <Text style={[styles.chipText, duration === d && styles.chipTextActive]}>
               {d} hr{d > 1 ? "s" : ""}
             </Text>
           </TouchableOpacity>
@@ -297,11 +294,7 @@ export default function BookingForm({
               </Text>
               {reason && (
                 <Text
-                  style={
-                    reason === "booked"
-                      ? styles.reasonBooked
-                      : styles.reasonOther
-                  }
+                  style={reason === "booked" ? styles.reasonBooked : styles.reasonOther}
                 >
                   {REASON_TEXT[reason]}
                 </Text>
@@ -317,6 +310,10 @@ export default function BookingForm({
           {hourText(startHour!)} – {hourText(startHour! + duration)}
         </Text>
       )}
+
+      <Text style={styles.notice}>
+        Saved in this app only. Contact the venue to confirm your slot.
+      </Text>
 
       <TouchableOpacity
         style={[styles.submit, saving && { opacity: 0.6 }]}
@@ -337,12 +334,7 @@ const styles = StyleSheet.create({
   container: { padding: 20, paddingBottom: 40 },
   courtName: { fontSize: 22, fontWeight: "bold", color: "#0B2A5B" },
   courtInfo: { color: "#6B7280", marginTop: 2 },
-  label: {
-    marginTop: 18,
-    marginBottom: 6,
-    fontWeight: "600",
-    color: "#374151",
-  },
+  label: { marginTop: 18, marginBottom: 6, fontWeight: "600", color: "#374151" },
   courtNote: { color: "#6B7280", marginBottom: 8 },
   input: {
     borderWidth: 1,
@@ -371,16 +363,12 @@ const styles = StyleSheet.create({
   chipText: { color: "#374151", fontWeight: "500" },
   chipTextActive: { color: "#fff" },
   chipTextDisabled: { color: "#9CA3AF", textDecorationLine: "line-through" },
-  reasonBooked: {
-    marginTop: 2,
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#B91C1C",
-  },
+  reasonBooked: { marginTop: 2, fontSize: 11, fontWeight: "700", color: "#B91C1C" },
   reasonOther: { marginTop: 2, fontSize: 11, color: "#6B7280" },
   summary: { marginTop: 8, color: "#16A34A", fontWeight: "700" },
+  notice: { marginTop: 16, color: "#6B7280", fontSize: 13, fontStyle: "italic" },
   submit: {
-    marginTop: 24,
+    marginTop: 16,
     backgroundColor: "#16A34A",
     padding: 14,
     borderRadius: 12,

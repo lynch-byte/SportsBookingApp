@@ -47,15 +47,23 @@ export default function MyBookingsScreen() {
           <Text style={styles.emptySub}>Pick a court and book a time slot.</Text>
         </View>
       }
+      ListFooterComponent={
+        bookings.length > 0 ? (
+          <Text style={styles.footer}>
+            Bookings are saved in this app only. Contact the venue to confirm your slot.
+          </Text>
+        ) : null
+      }
       renderItem={({ item }) => (
         <View style={styles.card}>
           <Text style={styles.title}>{item.court_name}</Text>
-            <Text style={styles.sub}>
+          <Text style={styles.sub}>
             {item.sport_type} · Court {item.court_number}
           </Text>
           <Text style={styles.when}>
             {item.date} · {timeRange(item.start_time, item.duration)}
           </Text>
+          <Text style={styles.sub}>Activity: {item.activity}</Text>
           <Text style={styles.sub}>
             {item.name} · {item.contact_number} · {item.duration} hr
             {item.duration > 1 ? "s" : ""}
@@ -83,6 +91,7 @@ const styles = StyleSheet.create({
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyText: { fontSize: 18, fontWeight: "600", color: "#374151" },
   emptySub: { marginTop: 4, color: "#6B7280" },
+  footer: { marginTop: 4, color: "#6B7280", fontSize: 13, fontStyle: "italic" },
   card: {
     padding: 16,
     marginBottom: 12,
