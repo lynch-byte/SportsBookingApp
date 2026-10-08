@@ -82,7 +82,7 @@ export default function CourtsScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0 }}
+                style={styles.filterScroll}
         contentContainerStyle={styles.filterRow}
       >
         {sportTypes.map((sport) => (
@@ -178,10 +178,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   empty: { textAlign: "center", color: "#6B7280", marginTop: 32 },
+   filterScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+    height: 68,
+  },
   filterRow: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 8,
-    padding: 16,
+    paddingHorizontal: 16,
+  
   },
   chip: {
     paddingHorizontal: 14,
