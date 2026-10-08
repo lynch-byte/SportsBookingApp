@@ -249,6 +249,10 @@ export async function addBooking(
 }
 
 // ---------- UPDATE ----------
+export async function deleteBooking(id: number) {
+  const db = await getDb();
+  await db.runAsync("DELETE FROM bookings WHERE id = ?", [id]);
+}
 
 export async function updateBooking(
   id: number,
