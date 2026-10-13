@@ -1,56 +1,98 @@
-# Welcome to your Expo app 👋
+# Sports Court Booking App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A React Native (Expo) mobile app for finding sports courts in Tagum City and managing court reservations. Users can browse venues, check availability, book a time slot, and reschedule or cancel their bookings.
 
-## Get started
+## Team
 
-1. Install dependencies
+| Name | Role |
+|---|---|
+| Steven Alonzo | Team Leader / Developer |
+| Nick Rhean Lucida | UI/UX / Database Developer |
 
-   ```bash
-   npm install
-   ```
+## Features
 
-2. Start the app
+- Browse about 130 venues across pickleball, basketball, badminton, tennis, volleyball, football, futsal, swimming, table tennis, athletics, martial arts, sepak takraw, archery, gymnastics and dance, and chess
+- Search by venue name or location, and filter by sport
+- Court details with price, location, number of courts, and an availability schedule by date
+- Venue links (Facebook, booking site, booking sheet, or phone call) for venues that take bookings elsewhere
+- Book a court: name, contact number, court number, activity, date, hourly slot, and duration
+- Conflict check before saving: the same court cannot be booked twice at an overlapping time, and the same contact number cannot hold two overlapping bookings
+- Reschedule or cancel a booking
+- My Bookings with Upcoming, Past, and Calendar views
+- Home dashboard showing the next upcoming booking
 
-   ```bash
-   npx expo start
-   ```
+## Screens
 
-In the output, you'll find options to open the app in a
+| Screen | Purpose |
+|---|---|
+| Home | Dashboard with shortcuts and the next booking |
+| Courts | Search, filter, and browse venues |
+| Court Details | Venue information, price, and availability by date |
+| Book Court | Create a reservation |
+| Edit Booking | Reschedule an existing reservation |
+| My Bookings | Upcoming, past, and calendar views of reservations |
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Tech Stack
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- React Native with Expo
+- TypeScript
+- Expo Router (file-based navigation built on React Navigation): bottom tabs plus stack screens
+- SQLite via `expo-sqlite` for local storage
+- Development tools: VS Code, GitHub, Expo Go on an Android device
 
-## Get a fresh project
+## Getting Started
 
-When you're ready, run:
+1. Install dependencies:
 
 ```bash
-npm run reset-project
+   npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+2. Start the development server:
 
-### Other setup steps
+```bash
+   npx expo start
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+   If your phone cannot connect, try `npx expo start --tunnel`, or `npx expo start -c` to clear the cache.
 
-## Learn more
+3. Scan the QR code with the Expo Go app on your phone (the phone and computer should be on the same Wi-Fi network).
 
-To learn more about developing your project with Expo, look at the following resources:
+## Project Structure
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```
+src
+ ├─ app
+ │   ├─ (tabs)
+ │   │   ├─ index.tsx            Home
+ │   │   ├─ courts.tsx           Courts list, search, and filters
+ │   │   └─ my-bookings.tsx      Upcoming, past, and calendar views
+ │   ├─ book/[courtId].tsx       Book Court
+ │   ├─ court/[id].tsx           Court Details
+ │   ├─ edit-booking/[id].tsx    Edit Booking
+ │   └─ _layout.tsx              Root layout and database setup
+ ├─ components
+ │   └─ BookingForm.tsx          Shared form for booking and rescheduling
+ └─ database
+     ├─ courtsData.ts            Venue seed data
+     └─ db.ts                    SQLite setup and CRUD functions
+```
 
-## Join the community
+## Database
 
-Join our community of developers creating universal apps.
+The app uses a local SQLite database with two tables:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `courts`: venue name, sport, location, description, starting price, price unit, price note, booking link, and number of courts
+- `bookings`: court, court number, name, contact number, activity, date, start time, duration, and status
+
+Venues are loaded from `src/database/courtsData.ts` the first time the app runs. If you edit that file, change the database name in `src/database/db.ts` (for example `courtbooking_v6.db` to `courtbooking_v7.db`) so the app reseeds on the next launch. This also clears saved bookings.
+
+## Scope and Limitations
+
+This project follows the scope of the original proposal:
+
+- Bookings are saved on the device only. The venue does not receive them, so users should confirm with the venue to secure a slot.
+- There is no login system, online payment, push notification, or web admin panel.
+- Availability only reflects bookings made in this app, not the venue's own reservations.
+- Time slots assume opening hours of 6 AM to 10 PM for every venue.
+- Venue details (prices, addresses, links) were collected manually and may change. Verify them with the venue.
