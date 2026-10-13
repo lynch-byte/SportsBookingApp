@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { estimateTotal, formatMoney } from "../../components/PriceSummary";
 import { BookingWithCourt, deleteBooking, getBookings } from "../../database/db";
 
 type Tab = "upcoming" | "past" | "calendar";
@@ -39,6 +40,15 @@ function endsAt(b: BookingWithCourt) {
   const [y, mo, d] = b.date.split("-").map(Number);
   const [h, m] = b.start_time.split(":").map(Number);
   return new Date(y, mo - 1, d, h + b.duration, m);
+}
+
+// Price line shown on each booking card
+function priceText(b: BookingWithCourt) {
+  if (b.price_from === null) return "Price on inquiry";
+  if (b.price_from === 0) return "Free";
+  if (b.price_unit === "person") return `${formatMoney(b.price_from)} / person`;
+  const total = estimateTotal(b.price_from, b.price_unit, b.duration);
+  return `Est. total ${formatMoney(total ?? 0)}`;
 }
 
 export default function MyBookingsScreen() {
@@ -137,6 +147,7 @@ export default function MyBookingsScreen() {
           {item.name} · {item.contact_number} · {item.duration} hr
           {item.duration > 1 ? "s" : ""}
         </Text>
+        <Text style={styles.price}>{priceText(item)}</Text>
         <View style={styles.actions}>
           {!past_ && (
             <TouchableOpacity
@@ -161,7 +172,8 @@ export default function MyBookingsScreen() {
 
   const notice = (
     <Text style={styles.footer}>
-      Bookings are saved in this app only. Contact the venue to confirm your slot.
+      Bookings are saved in this app only. Prices are estimates; contact the venue to
+      confirm your slot and the final amount.
     </Text>
   );
 
@@ -315,6 +327,7 @@ const styles = StyleSheet.create({
   sub: { color: "#6B7280", marginTop: 2 },
   when: { color: "#16A34A", fontWeight: "600", marginTop: 6 },
   whenPast: { color: "#6B7280" },
+  price: { marginTop: 6, fontWeight: "700", color: "#16A34A" },
   actions: { flexDirection: "row", gap: 10, marginTop: 12 },
   editBtn: {
     paddingHorizontal: 14,

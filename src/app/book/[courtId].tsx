@@ -20,6 +20,9 @@ export default function BookCourtScreen() {
       courtId={court.id}
       courtName={court.name}
       courtCount={court.court_count}
+      priceFrom={court.price_from}
+      priceUnit={court.price_unit}
+      priceNote={court.price_note}
       submitLabel="Confirm booking"
       onSubmit={(d) => addBooking({ court_id: court.id, ...d })}
       onDone={() => {

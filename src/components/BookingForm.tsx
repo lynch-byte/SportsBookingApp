@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { Booking, getBookingsForCourtOnDate } from "../database/db";
+import PriceSummary from "./PriceSummary";
 
 export type FormData = {
   name: string;
@@ -25,6 +26,9 @@ type Props = {
   courtName: string;
   courtId: number;
   courtCount: number; // how many courts the venue has
+  priceFrom: number | null; // starting price of the venue
+  priceUnit: string; // "hour" or "person"
+  priceNote: string | null;
   bookingId?: number; // set when editing
   initial?: Partial<FormData>;
   submitLabel: string;
@@ -66,6 +70,9 @@ export default function BookingForm({
   courtName,
   courtId,
   courtCount,
+  priceFrom,
+  priceUnit,
+  priceNote,
   bookingId,
   initial,
   submitLabel,
@@ -305,10 +312,15 @@ export default function BookingForm({
       </View>
 
       {validStart && (
-        <Text style={styles.summary}>
-          Your booking: {courtCount > 1 ? `Court ${courtNumber} · ` : ""}
-          {hourText(startHour!)} – {hourText(startHour! + duration)}
-        </Text>
+        <PriceSummary
+          courtLabel={courtCount > 1 ? `Court ${courtNumber}` : courtName}
+          date={date}
+          startHour={startHour!}
+          duration={duration}
+          priceFrom={priceFrom}
+          priceUnit={priceUnit}
+          priceNote={priceNote}
+        />
       )}
 
       <Text style={styles.notice}>
@@ -365,7 +377,6 @@ const styles = StyleSheet.create({
   chipTextDisabled: { color: "#9CA3AF", textDecorationLine: "line-through" },
   reasonBooked: { marginTop: 2, fontSize: 11, fontWeight: "700", color: "#B91C1C" },
   reasonOther: { marginTop: 2, fontSize: 11, color: "#6B7280" },
-  summary: { marginTop: 8, color: "#16A34A", fontWeight: "700" },
   notice: { marginTop: 16, color: "#6B7280", fontSize: 13, fontStyle: "italic" },
   submit: {
     marginTop: 16,

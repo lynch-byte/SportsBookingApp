@@ -30,6 +30,8 @@ export type Booking = {
 export type BookingWithCourt = Booking & {
   court_name: string;
   sport_type: string;
+  price_from: number | null;
+  price_unit: string;
 };
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -121,7 +123,7 @@ export async function getCourtById(id: number): Promise<Court | null> {
 export async function getBookings(): Promise<BookingWithCourt[]> {
   const db = await getDb();
   return db.getAllAsync<BookingWithCourt>(`
-    SELECT b.*, c.name AS court_name, c.sport_type
+    SELECT b.*, c.name AS court_name, c.sport_type, c.price_from, c.price_unit
     FROM bookings b
     JOIN courts c ON c.id = b.court_id
     ORDER BY b.date DESC, b.start_time DESC
@@ -187,7 +189,7 @@ export async function findPersonConflict(
 ): Promise<string | null> {
   const db = await getDb();
   const rows = await db.getAllAsync<BookingWithCourt>(
-    `SELECT b.*, c.name AS court_name, c.sport_type
+    `SELECT b.*, c.name AS court_name, c.sport_type, c.price_from, c.price_unit
      FROM bookings b
      JOIN courts c ON c.id = b.court_id
      WHERE b.date = ?`,

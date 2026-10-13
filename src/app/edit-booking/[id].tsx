@@ -33,6 +33,9 @@ export default function EditBookingScreen() {
       courtId={booking.court_id}
       courtName={court.name}
       courtCount={court.court_count}
+      priceFrom={court.price_from}
+      priceUnit={court.price_unit}
+      priceNote={court.price_note}
       bookingId={booking.id}
       initial={{
         name: booking.name,
