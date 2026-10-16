@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { estimateTotal, formatMoney } from "../../components/PriceSummary";
+import { useAuth } from "../../context/AuthContext";
 import { BookingWithCourt, deleteBooking, getBookings } from "../../database/db";
 
 type Tab = "upcoming" | "past" | "calendar";
@@ -53,6 +54,7 @@ function priceText(b: BookingWithCourt) {
 
 export default function MyBookingsScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [bookings, setBookings] = useState<BookingWithCourt[]>([]);
   const [tab, setTab] = useState<Tab>("upcoming");
 
@@ -63,25 +65,32 @@ export default function MyBookingsScreen() {
     return { year: d.getFullYear(), month: d.getMonth() };
   });
 
+  const userId = user?.id;
   const load = useCallback(() => {
-    getBookings().then(setBookings);
-  }, []);
+    if (userId !== undefined) getBookings(userId).then(setBookings);
+  }, [userId]);
 
   useFocusEffect(load);
 
   const now = new Date();
-  const isPast = (b: BookingWithCourt) => endsAt(b) <= now;
+  const isCancelled = (b: BookingWithCourt) => b.status === "cancelled";
+  const hasEnded = (b: BookingWithCourt) => endsAt(b) <= now;
 
+  // Upcoming = confirmed and not finished. Past = finished or cancelled.
   const upcoming = bookings
-    .filter((b) => !isPast(b))
+    .filter((b) => !isCancelled(b) && !hasEnded(b))
     .sort((a, b) => (a.date + a.start_time).localeCompare(b.date + b.start_time));
   const past = bookings
-    .filter((b) => isPast(b))
+    .filter((b) => isCancelled(b) || hasEnded(b))
     .sort((a, b) => (b.date + b.start_time).localeCompare(a.date + a.start_time));
 
-  // Calendar data
+  // Cancelled by the admin and still in the future: the user should notice these
+  const newlyCancelled = bookings.filter((b) => isCancelled(b) && !hasEnded(b));
+
+  // Calendar data (cancelled bookings are not shown)
+  const active = bookings.filter((b) => !isCancelled(b));
   const countByDate: Record<string, number> = {};
-  bookings.forEach((b) => {
+  active.forEach((b) => {
     countByDate[b.date] = (countByDate[b.date] ?? 0) + 1;
   });
 
@@ -105,7 +114,7 @@ export default function MyBookingsScreen() {
     });
   }
 
-  const dayBookings = bookings
+  const dayBookings = active
     .filter((b) => b.date === selected)
     .sort((a, b) => a.start_time.localeCompare(b.start_time));
 
@@ -113,14 +122,14 @@ export default function MyBookingsScreen() {
   const selectedLabel = `${WEEKDAYS[new Date(sy, sm - 1, sd).getDay()]}, ${MONTHS[sm - 1]} ${sd}`;
 
   function confirmRemove(b: BookingWithCourt) {
-    const past_ = isPast(b);
+    const finished = isCancelled(b) || hasEnded(b);
     Alert.alert(
-      past_ ? "Remove from history?" : "Cancel booking?",
+      finished ? "Remove from history?" : "Cancel booking?",
       `${b.court_name} on ${b.date}`,
       [
         { text: "Keep it", style: "cancel" },
         {
-          text: past_ ? "Remove" : "Cancel booking",
+          text: finished ? "Remove" : "Cancel booking",
           style: "destructive",
           onPress: async () => {
             await deleteBooking(b.id);
@@ -132,14 +141,38 @@ export default function MyBookingsScreen() {
   }
 
   function renderBooking(item: BookingWithCourt) {
-    const past_ = isPast(item);
+    const cancelled = isCancelled(item);
+    const ended = hasEnded(item);
+    const canChange = !cancelled && !ended;
+
+    const badgeStyle = cancelled
+      ? styles.badgeRed
+      : ended
+      ? styles.badgeGray
+      : styles.badgeGreen;
+    const badgeTextStyle = cancelled
+      ? styles.badgeTextRed
+      : ended
+      ? styles.badgeTextGray
+      : styles.badgeTextGreen;
+
     return (
-      <View key={item.id} style={[styles.card, past_ && styles.cardPast]}>
-        <Text style={styles.title}>{item.court_name}</Text>
+      <View
+        key={item.id}
+        style={[styles.card, ended && !cancelled && styles.cardPast]}
+      >
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{item.court_name}</Text>
+          <View style={[styles.badge, badgeStyle]}>
+            <Text style={[styles.badgeText, badgeTextStyle]}>
+              {cancelled ? "Cancelled" : ended ? "Completed" : "Confirmed"}
+            </Text>
+          </View>
+        </View>
         <Text style={styles.sub}>
           {item.sport_type} · Court {item.court_number}
         </Text>
-        <Text style={[styles.when, past_ && styles.whenPast]}>
+        <Text style={[styles.when, (ended || cancelled) && styles.whenPast]}>
           {item.date} · {timeRange(item.start_time, item.duration)}
         </Text>
         <Text style={styles.sub}>Activity: {item.activity}</Text>
@@ -147,9 +180,20 @@ export default function MyBookingsScreen() {
           {item.name} · {item.contact_number} · {item.duration} hr
           {item.duration > 1 ? "s" : ""}
         </Text>
-        <Text style={styles.price}>{priceText(item)}</Text>
+
+        {cancelled ? (
+          <View style={styles.noteBox}>
+            <Text style={styles.noteTitle}>Cancelled by the administrator</Text>
+            <Text style={styles.noteText}>
+              {item.admin_note || "No reason was given."}
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.price}>{priceText(item)}</Text>
+        )}
+
         <View style={styles.actions}>
-          {!past_ && (
+          {canChange && (
             <TouchableOpacity
               style={styles.editBtn}
               onPress={() =>
@@ -163,7 +207,7 @@ export default function MyBookingsScreen() {
             </TouchableOpacity>
           )}
           <TouchableOpacity style={styles.cancelBtn} onPress={() => confirmRemove(item)}>
-            <Text style={styles.cancelText}>{past_ ? "Remove" : "Cancel"}</Text>
+            <Text style={styles.cancelText}>{canChange ? "Cancel" : "Remove"}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -172,8 +216,8 @@ export default function MyBookingsScreen() {
 
   const notice = (
     <Text style={styles.footer}>
-      Bookings are saved in this app only. Prices are estimates; contact the venue to
-      confirm your slot and the final amount.
+      Bookings are confirmed right away. Prices are estimates; contact the venue for
+      the final amount.
     </Text>
   );
 
@@ -184,6 +228,18 @@ export default function MyBookingsScreen() {
   ];
 
   const listData = tab === "upcoming" ? upcoming : past;
+
+  const banner =
+    newlyCancelled.length > 0 ? (
+      <TouchableOpacity style={styles.banner} onPress={() => setTab("past")}>
+        <Text style={styles.bannerText}>
+          {newlyCancelled.length === 1
+            ? "1 of your bookings was cancelled by the administrator."
+            : `${newlyCancelled.length} of your bookings were cancelled by the administrator.`}{" "}
+          Tap to see why.
+        </Text>
+      </TouchableOpacity>
+    ) : null;
 
   return (
     <View style={{ flex: 1 }}>
@@ -276,6 +332,7 @@ export default function MyBookingsScreen() {
           data={listData}
           keyExtractor={(b) => String(b.id)}
           contentContainerStyle={{ padding: 16, flexGrow: 1 }}
+          ListHeaderComponent={tab === "upcoming" ? banner : null}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Text style={styles.emptyText}>
@@ -284,7 +341,7 @@ export default function MyBookingsScreen() {
               <Text style={styles.emptySub}>
                 {tab === "upcoming"
                   ? "Pick a court and book a time slot."
-                  : "Finished bookings will show up here."}
+                  : "Finished and cancelled bookings will show up here."}
               </Text>
             </View>
           }
@@ -310,9 +367,17 @@ const styles = StyleSheet.create({
   tabText: { fontWeight: "600", color: "#374151", fontSize: 13 },
   tabTextActive: { color: "#fff" },
 
+  banner: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: "#FEE2E2",
+  },
+  bannerText: { color: "#991B1B", fontWeight: "600" },
+
   empty: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyText: { fontSize: 18, fontWeight: "600", color: "#374151" },
-  emptySub: { marginTop: 4, color: "#6B7280" },
+  emptySub: { marginTop: 4, color: "#6B7280", textAlign: "center" },
   footer: { marginTop: 4, color: "#6B7280", fontSize: 13, fontStyle: "italic" },
 
   card: {
@@ -323,11 +388,35 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardPast: { opacity: 0.75 },
-  title: { fontSize: 16, fontWeight: "bold" },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  title: { flex: 1, fontSize: 16, fontWeight: "bold" },
+  badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 },
+  badgeGreen: { backgroundColor: "#DCFCE7" },
+  badgeGray: { backgroundColor: "#E5E7EB" },
+  badgeRed: { backgroundColor: "#FEE2E2" },
+  badgeText: { fontSize: 11, fontWeight: "700" },
+  badgeTextGreen: { color: "#166534" },
+  badgeTextGray: { color: "#4B5563" },
+  badgeTextRed: { color: "#991B1B" },
   sub: { color: "#6B7280", marginTop: 2 },
   when: { color: "#16A34A", fontWeight: "600", marginTop: 6 },
   whenPast: { color: "#6B7280" },
   price: { marginTop: 6, fontWeight: "700", color: "#16A34A" },
+  noteBox: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+  },
+  noteTitle: { color: "#991B1B", fontWeight: "700" },
+  noteText: { color: "#7F1D1D", marginTop: 2 },
   actions: { flexDirection: "row", gap: 10, marginTop: 12 },
   editBtn: {
     paddingHorizontal: 14,

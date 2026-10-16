@@ -9,7 +9,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Booking, getBookingsForCourtOnDate } from "../database/db";
+import {
+  Booking,
+  getBookingsForCourtOnDate,
+  getMaintenanceOnDate,
+  Maintenance,
+} from "../database/db";
 import PriceSummary from "./PriceSummary";
 
 export type FormData = {
@@ -26,6 +31,8 @@ type Props = {
   courtName: string;
   courtId: number;
   courtCount: number; // how many courts the venue has
+  openHour: number; // venue opening hour, 24h
+  closeHour: number; // venue closing hour, 24h
   priceFrom: number | null; // starting price of the venue
   priceUnit: string; // "hour" or "person"
   priceNote: string | null;
@@ -36,14 +43,17 @@ type Props = {
   onDone: () => void;
 };
 
-type Reason = "late" | "past" | "booked" | null;
+type Reason = "late" | "past" | "maint" | "booked" | null;
 
-const OPEN_HOUR = 6;
-const CLOSE_HOUR = 22;
 const DURATIONS = [1, 2, 3, 4];
 const ACTIVITIES = ["Casual play", "Practice", "Game / Match", "Training", "Event"];
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const REASON_TEXT = { late: "Too late", past: "Passed", booked: "Booked" };
+const REASON_TEXT = {
+  late: "Too late",
+  past: "Passed",
+  maint: "Maintenance",
+  booked: "Booked",
+};
 
 function toDateStr(d: Date) {
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -58,7 +68,8 @@ function toMinutes(t: string) {
 
 // 7 -> "7 AM", 13 -> "1 PM"
 function hourText(h: number) {
-  return `${h % 12 || 12} ${h < 12 ? "AM" : "PM"}`;
+  const hh = h % 24;
+  return `${hh % 12 || 12} ${hh < 12 ? "AM" : "PM"}`;
 }
 
 // 7 -> "7 AM – 8 AM"
@@ -70,6 +81,8 @@ export default function BookingForm({
   courtName,
   courtId,
   courtCount,
+  openHour,
+  closeHour,
   priceFrom,
   priceUnit,
   priceNote,
@@ -90,6 +103,7 @@ export default function BookingForm({
   const [start, setStart] = useState<string | null>(initial?.start_time ?? null);
   const [duration, setDuration] = useState(initial?.duration ?? 1);
   const [booked, setBooked] = useState<Booking[]>([]);
+  const [maintenance, setMaintenance] = useState<Maintenance[]>([]);
   const [saving, setSaving] = useState(false);
 
   const courtChoices = Array.from({ length: courtCount }, (_, i) => i + 1);
@@ -106,11 +120,12 @@ export default function BookingForm({
 
   useEffect(() => {
     getBookingsForCourtOnDate(courtId, date).then(setBooked);
+    getMaintenanceOnDate(courtId, date).then(setMaintenance);
   }, [courtId, date]);
 
   const hours = Array.from(
-    { length: CLOSE_HOUR - OPEN_HOUR },
-    (_, i) => OPEN_HOUR + i
+    { length: Math.max(0, closeHour - openHour) },
+    (_, i) => openHour + i
   );
 
   // Bookings on the court the user has selected (other courts are ignored)
@@ -118,13 +133,21 @@ export default function BookingForm({
     (b) => b.court_number === courtNumber && b.id !== bookingId
   );
 
+  // Maintenance that affects the selected court
+  const courtMaintenance = maintenance.filter(
+    (m) => m.court_number === 0 || m.court_number === courtNumber
+  );
+
   // Why a slot can't be picked (null = available)
   function slotReason(hour: number): Reason {
     const s = hour * 60;
     const e = s + duration * 60;
-    if (e > CLOSE_HOUR * 60) return "late";
+    if (e > closeHour * 60) return "late";
     if (!bookingId && date === today && s <= now.getHours() * 60 + now.getMinutes()) {
       return "past";
+    }
+    if (courtMaintenance.some((m) => s < m.end_hour * 60 && e > m.start_hour * 60)) {
+      return "maint";
     }
     const clash = courtBookings.some((b) => {
       const bs = toMinutes(b.start_time);
@@ -162,7 +185,7 @@ export default function BookingForm({
     });
     setSaving(false);
     if (!res.ok) {
-      Alert.alert("Booking conflict", res.message ?? "Please try another time.");
+      Alert.alert("Can't book this time", res.message ?? "Please try another time.");
       return;
     }
     onDone();
@@ -171,9 +194,10 @@ export default function BookingForm({
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.courtName}>{courtName}</Text>
-      {courtCount > 1 && (
-        <Text style={styles.courtInfo}>{courtCount} courts at this venue</Text>
-      )}
+      <Text style={styles.courtInfo}>
+        Open {hourText(openHour)} – {hourText(closeHour)}
+        {courtCount > 1 ? ` · ${courtCount} courts` : ""}
+      </Text>
 
       <Text style={styles.label}>Your name</Text>
       <TextInput
@@ -272,7 +296,16 @@ export default function BookingForm({
               })
               .join(", ")}
       </Text>
-      <View style={[styles.row, { flexWrap: "wrap" }]}>
+      {courtMaintenance.map((m) => (
+        <Text key={m.id} style={styles.maintNote}>
+          Closed{" "}
+          {m.start_hour === 0 && m.end_hour === 24
+            ? "all day"
+            : `${hourText(m.start_hour)} – ${hourText(m.end_hour)}`}
+          : {m.reason}
+        </Text>
+      ))}
+      <View style={[styles.row, { flexWrap: "wrap", marginTop: 6 }]}>
         {hours.map((h) => {
           const value = `${String(h).padStart(2, "0")}:00`;
           const reason = slotReason(h);
@@ -301,7 +334,11 @@ export default function BookingForm({
               </Text>
               {reason && (
                 <Text
-                  style={reason === "booked" ? styles.reasonBooked : styles.reasonOther}
+                  style={
+                    reason === "booked" || reason === "maint"
+                      ? styles.reasonBooked
+                      : styles.reasonOther
+                  }
                 >
                   {REASON_TEXT[reason]}
                 </Text>
@@ -324,7 +361,8 @@ export default function BookingForm({
       )}
 
       <Text style={styles.notice}>
-        Saved in this app only. Contact the venue to confirm your slot.
+        Your booking is confirmed right away. Contact the venue if you need to
+        change anything.
       </Text>
 
       <TouchableOpacity
@@ -347,7 +385,8 @@ const styles = StyleSheet.create({
   courtName: { fontSize: 22, fontWeight: "bold", color: "#0B2A5B" },
   courtInfo: { color: "#6B7280", marginTop: 2 },
   label: { marginTop: 18, marginBottom: 6, fontWeight: "600", color: "#374151" },
-  courtNote: { color: "#6B7280", marginBottom: 8 },
+  courtNote: { color: "#6B7280", marginBottom: 4 },
+  maintNote: { color: "#B91C1C", fontWeight: "600", marginBottom: 2 },
   input: {
     borderWidth: 1,
     borderColor: "#D1D5DB",

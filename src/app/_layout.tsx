@@ -1,17 +1,9 @@
 import { Stack } from "expo-router";
-import { useEffect, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
-import { initDatabase } from "../database/db";
+import { AuthProvider, useAuth } from "../context/AuthContext";
 
-export default function RootLayout() {
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    initDatabase()
-      .then(() => setReady(true))
-      .catch((e) => setError(String(e?.message ?? e)));
-  }, []);
+function RootNavigator() {
+  const { user, ready, error } = useAuth();
 
   if (error) {
     return (
@@ -28,7 +20,7 @@ export default function RootLayout() {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color="#0B2A5B" />
-        <Text style={{ marginTop: 12 }}>Loading courts...</Text>
+        <Text style={{ marginTop: 12 }}>Loading...</Text>
       </View>
     );
   }
@@ -40,10 +32,27 @@ export default function RootLayout() {
         headerTintColor: "#fff",
       }}
     >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="court/[id]" options={{ title: "Court Details" }} />
-      <Stack.Screen name="book/[courtId]" options={{ title: "Book Court" }} />
-      <Stack.Screen name="edit-booking/[id]" options={{ title: "Edit Booking" }} />
+      {/* Only available when logged in */}
+      <Stack.Protected guard={!!user}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="court/[id]" options={{ title: "Court Details" }} />
+        <Stack.Screen name="book/[courtId]" options={{ title: "Book Court" }} />
+        <Stack.Screen name="edit-booking/[id]" options={{ title: "Edit Booking" }} />
+      </Stack.Protected>
+
+      {/* Only available when logged out */}
+      <Stack.Protected guard={!user}>
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="register" options={{ title: "Create account" }} />
+      </Stack.Protected>
     </Stack>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <RootNavigator />
+    </AuthProvider>
   );
 }
