@@ -419,7 +419,7 @@ function MaintenanceModal({ court, onClose }: { court: Court; onClose: () => voi
 
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Text style={styles.sectionTitle}>Scheduled closures</Text>
-            {entries.length === 0 ? (
+                        {entries.length === 0 ? (
               <Text style={styles.muted}>No closures yet.</Text>
             ) : (
               entries.map((m) => (
@@ -438,3 +438,289 @@ function MaintenanceModal({ court, onClose }: { court: Court; onClose: () => voi
                       · {m.reason}
                     </Text>
                   </View>
+                  <TouchableOpacity style={styles.removeBtn} onPress={() => confirmRemove(m)}>
+                    <Text style={styles.removeText}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+            
+            <Text style={[styles.sectionTitle, { marginTop: 18 }]}>Add a closure</Text>
+
+            <Text style={styles.label}>Which court?</Text>
+            <View style={styles.wrap}>
+              <Chip text="All courts" active={courtNumber === 0} onPress={() => setCourtNumber(0)} />
+              {Array.from({ length: court.court_count }, (_, i) => i + 1).map((n) => (
+                <Chip key={n} text={`Court ${n}`} active={courtNumber === n} onPress={() => setCourtNumber(n)} />
+              ))}
+            </View>
+
+            <Text style={styles.label}>From</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {dates.map((d) => (
+                  <Chip key={d.value} text={d.label} active={dateFrom === d.value} onPress={() => pickFrom(d.value)} />
+                ))}
+              </View>
+            </ScrollView>
+
+            <Text style={styles.label}>Until</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {dates
+                  .filter((d) => d.value >= dateFrom)
+                  .map((d) => (
+                    <Chip key={d.value} text={d.label} active={dateTo === d.value} onPress={() => setDateTo(d.value)} />
+                  ))}
+              </View>
+            </ScrollView>
+
+            <Text style={styles.label}>Time</Text>
+            <View style={styles.wrap}>
+              <Chip text="All day" active={allDay} onPress={() => setAllDay(true)} />
+              <Chip text="Certain hours" active={!allDay} onPress={() => setAllDay(false)} />
+            </View>
+            {!allDay && (
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <HourStepper label="From" value={startHour} min={0} max={23} onChange={setStartHour} />
+                <HourStepper label="Until" value={endHour} min={1} max={24} onChange={setEndHour} />
+              </View>
+            )}
+
+            <Text style={styles.label}>Reason (users will see this)</Text>
+            <View style={styles.wrap}>
+              {MAINT_REASONS.map((r) => (
+                <Chip key={r} text={r} active={reason === r} onPress={() => setReason(r)} />
+              ))}
+            </View>
+            <TextInput
+              style={styles.input}
+              value={reason}
+              onChangeText={setReason}
+              placeholder="Or type your own reason"
+            />
+
+            <TouchableOpacity style={[styles.greenBtn, { marginTop: 16 }]} onPress={handleAdd}>
+              <Text style={styles.greenText}>Add closure</Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          <View style={styles.sheetActions}>
+            <TouchableOpacity style={styles.grayBtn} onPress={onClose}>
+              <Text style={styles.grayText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+// ---------- the venue list ----------
+
+export default function AdminVenues() {
+  const [courts, setCourts] = useState<Court[]>([]);
+  const [query, setQuery] = useState("");
+  const [formFor, setFormFor] = useState<Court | "new" | null>(null);
+  const [maintFor, setMaintFor] = useState<Court | null>(null);
+
+  const load = useCallback(() => {
+    getCourts().then(setCourts);
+  }, []);
+
+  useFocusEffect(load);
+
+  const q = query.trim().toLowerCase();
+  const shown = q
+    ? courts.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          (c.location ?? "").toLowerCase().includes(q) ||
+          c.sport_type.toLowerCase().includes(q)
+      )
+    : courts;
+
+  function confirmDelete(c: Court) {
+    Alert.alert(
+      "Delete this venue?",
+      `${c.name} will be removed together with all of its bookings and maintenance entries. This can't be undone.`,
+      [
+        { text: "Keep it", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            await deleteCourt(c.id);
+            load();
+          },
+        },
+      ]
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={styles.topRow}>
+        <TextInput
+          style={[styles.search, { flex: 1 }]}
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search venues"
+          autoCorrect={false}
+        />
+        <TouchableOpacity style={styles.addBtn} onPress={() => setFormFor("new")}>
+          <Text style={styles.addText}>+ Add</Text>
+        </TouchableOpacity>
+      </View>
+
+      <FlatList
+        data={shown}
+        keyExtractor={(c) => String(c.id)}
+        contentContainerStyle={{ padding: 16 }}
+        keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={<Text style={styles.empty}>No venues found.</Text>}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <Text style={styles.title}>{item.name}</Text>
+            <Text style={styles.sub}>
+              {item.sport_type} · {item.location}
+            </Text>
+            <Text style={styles.sub}>
+              Open {hourText(item.open_hour)} – {hourText(item.close_hour)} · {item.court_count} court
+              {item.court_count > 1 ? "s" : ""}
+            </Text>
+            <Text style={styles.price}>{priceLabel(item)}</Text>
+            <View style={styles.actions}>
+              <TouchableOpacity style={styles.navyBtn} onPress={() => setFormFor(item)}>
+                <Text style={styles.navyText}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.amberBtn} onPress={() => setMaintFor(item)}>
+                <Text style={styles.amberText}>Maintenance</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.redBtn} onPress={() => confirmDelete(item)}>
+                <Text style={styles.redText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      />
+
+      {formFor !== null && (
+        <VenueFormModal
+          key={formFor === "new" ? "new" : formFor.id}
+          court={formFor === "new" ? null : formFor}
+          onClose={() => setFormFor(null)}
+          onSaved={() => {
+            setFormFor(null);
+            load();
+          }}
+        />
+      )}
+
+      {maintFor && (
+        <MaintenanceModal key={maintFor.id} court={maintFor} onClose={() => setMaintFor(null)} />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  topRow: { flexDirection: "row", gap: 10, padding: 16, paddingBottom: 0 },
+  search: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 10,
+    backgroundColor: "#fff",
+  },
+  addBtn: {
+    paddingHorizontal: 16,
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: "#16A34A",
+  },
+  addText: { color: "#fff", fontWeight: "700" },
+  empty: { textAlign: "center", color: "#6B7280", marginTop: 32 },
+
+  card: {
+    padding: 16,
+    marginBottom: 12,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    elevation: 2,
+  },
+  title: { fontSize: 16, fontWeight: "bold" },
+  sub: { color: "#6B7280", marginTop: 2 },
+  price: { marginTop: 6, fontWeight: "700", color: "#16A34A" },
+  actions: { flexDirection: "row", gap: 8, marginTop: 12, flexWrap: "wrap" },
+  navyBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: "#0B2A5B" },
+  navyText: { color: "#fff", fontWeight: "600" },
+  amberBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: "#FEF3C7" },
+  amberText: { color: "#92400E", fontWeight: "600" },
+  redBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: "#FEE2E2" },
+  redText: { color: "#B91C1C", fontWeight: "600" },
+
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    maxHeight: "92%",
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 18,
+  },
+  sheetTitle: { fontSize: 20, fontWeight: "800", color: "#111827" },
+  sheetSub: { color: "#6B7280", marginBottom: 6 },
+  sheetActions: { flexDirection: "row", gap: 10, marginTop: 14 },
+  grayBtn: { flex: 1, padding: 13, borderRadius: 10, backgroundColor: "#E5E7EB", alignItems: "center" },
+  grayText: { fontWeight: "700", color: "#374151" },
+  greenBtn: { flex: 1, padding: 13, borderRadius: 10, backgroundColor: "#16A34A", alignItems: "center" },
+  greenText: { fontWeight: "700", color: "#fff" },
+
+  label: { marginTop: 14, marginBottom: 6, fontWeight: "600", color: "#374151" },
+  input: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: "#fff",
+  },
+  wrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: "#E5E7EB" },
+  chipActive: { backgroundColor: "#0B2A5B" },
+  chipText: { color: "#374151", fontWeight: "500", fontSize: 13 },
+  chipTextActive: { color: "#fff" },
+
+  stepRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  stepBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepBtnText: { fontSize: 20, fontWeight: "700", color: "#0B2A5B" },
+  stepValue: { minWidth: 60, textAlign: "center", fontWeight: "700", color: "#111827" },
+
+  sectionTitle: { marginTop: 8, fontWeight: "800", color: "#0B2A5B", fontSize: 15 },
+  muted: { color: "#6B7280", marginTop: 2 },
+  entry: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    marginTop: 8,
+    borderRadius: 10,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  entryTitle: { fontWeight: "700", color: "#111827" },
+  removeBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: "#FEE2E2" },
+  removeText: { color: "#B91C1C", fontWeight: "600" },
+});
