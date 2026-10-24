@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../../context/AuthContext";
 import {
   Booking,
   Court,
@@ -33,6 +34,11 @@ function timeRange(start: string, duration: number) {
   return `${fmt(h, m)} – ${fmt(h + duration, m)}`;
 }
 
+function hourText(h: number) {
+  const hh = h % 24;
+  return `${hh % 12 || 12} ${hh < 12 ? "AM" : "PM"}`;
+}
+
 function formatPrice(price: number | null, unit: string) {
   if (price === null) return "Price on inquiry";
   if (price === 0) return "Free";
@@ -50,6 +56,9 @@ function getLinkLabel(url: string | null) {
 export default function CourtDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
   const [court, setCourt] = useState<Court | null>(null);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState(toDateStr(new Date()));
@@ -102,6 +111,14 @@ export default function CourtDetailsScreen() {
         <Text style={styles.value}>{court.location}</Text>
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.label}>Opening hours</Text>
+        <Text style={styles.value}>
+          {hourText(court.open_hour)} – {hourText(court.close_hour)}
+          {court.court_count > 1 ? ` · ${court.court_count} courts` : ""}
+        </Text>
+      </View>
+
       {!!court.description && (
         <View style={styles.section}>
           <Text style={styles.label}>Details</Text>
@@ -114,9 +131,7 @@ export default function CourtDetailsScreen() {
         <Text style={styles.price}>
           {formatPrice(court.price_from, court.price_unit)}
         </Text>
-        {!!court.price_note && (
-          <Text style={styles.note}>{court.price_note}</Text>
-        )}
+        {!!court.price_note && <Text style={styles.note}>{court.price_note}</Text>}
       </View>
 
       {/* Availability */}
@@ -135,10 +150,7 @@ export default function CourtDetailsScreen() {
                 style={[styles.chip, date === d.value && styles.chipActive]}
               >
                 <Text
-                  style={[
-                    styles.chipText,
-                    date === d.value && styles.chipTextActive,
-                  ]}
+                  style={[styles.chipText, date === d.value && styles.chipTextActive]}
                 >
                   {d.label}
                 </Text>
@@ -157,9 +169,7 @@ export default function CourtDetailsScreen() {
           <View style={{ marginTop: 4 }}>
             {booked.map((b) => (
               <View key={b.id} style={styles.slot}>
-                <Text style={styles.slotTime}>
-                  {timeRange(b.start_time, b.duration)}
-                </Text>
+                <Text style={styles.slotTime}>{timeRange(b.start_time, b.duration)}</Text>
                 <Text style={styles.slotTag}>
                   {court.court_count > 1 ? `Court ${b.court_number} · Booked` : "Booked"}
                 </Text>
@@ -168,8 +178,7 @@ export default function CourtDetailsScreen() {
           </View>
         )}
         <Text style={styles.note}>
-          Shows bookings made in this app only. The venue may have other
-          reservations.
+          Shows bookings made in this app only. The venue may have other reservations.
         </Text>
       </View>
 
@@ -182,7 +191,9 @@ export default function CourtDetailsScreen() {
           })
         }
       >
-        <Text style={styles.bookButtonText}>Book this court</Text>
+        <Text style={styles.bookButtonText}>
+          {isAdmin ? "Book for a customer" : "Book this court"}
+        </Text>
       </TouchableOpacity>
 
       {linkLabel ? (
@@ -194,8 +205,8 @@ export default function CourtDetailsScreen() {
             <Text style={styles.linkButtonText}>{linkLabel}</Text>
           </TouchableOpacity>
           <Text style={styles.warning}>
-            This venue also takes bookings through its own page. Check with
-            them to avoid a double booking.
+            This venue also takes bookings through its own page. Check with them to
+            avoid a double booking.
           </Text>
         </>
       ) : (
